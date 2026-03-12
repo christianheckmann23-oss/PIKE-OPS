@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIKE OPS // CLASSIFIED</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00ff41;
+    --green-dim: #00b32c;
+    --green-dark: #003b0f;
+    --green-muted: #1a4d1a;
+    --black: #000000;
+    --bg: #020a02;
+    --text: #00ff41;
+    --amber: #ffb700;
+    --red: #ff2020;
+    --camo1: #3b4a2f;
+    --camo2: #2e3b1e;
+    --camo3: #4a5c35;
+    --camo4: #1a2210;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+    animation: scanlines 8s linear infinite;
+  }
+
+  @keyframes scanlines {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  /* NOISE TEXTURE */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  /* CAMO PATTERN BG */
+  .camo-bg {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0.04;
+    background-color: var(--camo1);
+    background-image:
+      radial-gradient(ellipse 80px 60px at 20% 30%, var(--camo2) 0%, transparent 70%),
+      radial-gradient(ellipse 120px 80px at 70% 20%, var(--camo3) 0%, transparent 70%),
+      radial-gradient(ellipse 60px 100px at 50% 60%, var(--camo4) 0%, transparent 70%),
+      radial-gradient(ellipse 140px 60px at 10% 80%, var(--camo2) 0%, transparent 70%),
+      radial-gradient(ellipse 90px 90px at 85% 70%, var(--camo3) 0%, transparent 70%),
+      radial-gradient(ellipse 70px 50px at 40% 90%, var(--camo1) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* MATRIX RAIN */
+  #matrix-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0.07;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ========== LOGIN SCREEN ========== */
+  #login-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: opacity 0.8s ease;
+  }
+
+  #login-screen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .terminal-frame {
+    border: 1px solid var(--green-dim);
+    padding: 40px 50px;
+    max-width: 500px;
+    width: 90%;
+    position: relative;
+    background: rgba(0, 20, 0, 0.9);
+    box-shadow:
+      0 0 30px rgba(0,255,65,0.15),
+      inset 0 0 30px rgba(0,0,0,0.5);
+  }
+
+  .terminal-frame::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: 10%; right: 10%;
+    height: 1px;
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  .terminal-frame::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 10%; right: 10%;
+    height: 1px;
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  .corner {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-color: var(--green);
+    border-style: solid;
+  }
+  .corner.tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  .corner.tr { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
+  .corner.br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+  .classified-stamp {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 8px;
+    color: var(--red);
+    text-align: center;
+    border: 2px solid var(--red);
+    padding: 4px 12px;
+    margin-bottom: 24px;
+    opacity: 0.9;
+    text-shadow: 0 0 8px var(--red);
+    box-shadow: 0 0 8px rgba(255,32,32,0.3);
+    transform: rotate(-1deg);
+    display: inline-block;
+  }
+
+  .skull-icon {
+    font-size: 48px;
+    text-align: center;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 0 10px rgba(0,255,65,0.5));
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(0,255,65,0.4)); }
+    50% { filter: drop-shadow(0 0 20px rgba(0,255,65,0.9)); }
+  }
+
+  .op-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: 4px;
+    margin-bottom: 4px;
+    text-shadow: 0 0 20px var(--green), 0 0 40px rgba(0,255,65,0.3);
+    animation: flicker 4s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.8; }
+    97% { opacity: 1; }
+    98% { opacity: 0.6; }
+    99% { opacity: 1; }
+  }
+
+  .op-subtitle {
+    font-size: 11px;
+    letter-spacing: 6px;
+    color: var(--green-dim);
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  .terminal-line {
+    font-size: 12px;
+    color: var(--green-dim);
+    margin-bottom: 6px;
+    animation: type-in 0.5s steps(40, end);
+  }
+
+  .terminal-line .prompt { color: var(--amber); }
+
+  .boot-log {
+    margin-bottom: 20px;
+    padding: 10px;
+    border-left: 2px solid var(--green-dark);
+    background: rgba(0,10,0,0.5);
+  }
+
+  .access-label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--green-dim);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  .code-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--green-dim);
+    padding: 10px 14px;
+    background: rgba(0,5,0,0.8);
+    position: relative;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .code-input-wrapper:focus-within {
+    border-color: var(--green);
+    box-shadow: 0 0 15px rgba(0,255,65,0.2);
+  }
+
+  .code-input-wrapper.error {
+    border-color: var(--red);
+    box-shadow: 0 0 15px rgba(255,32,32,0.3);
+    animation: shake 0.4s ease;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  .input-prompt {
+    color: var(--amber);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  #access-code {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 22px;
+    letter-spacing: 8px;
+    width: 100%;
+    caret-color: var(--green);
+  }
+
+  #access-code::placeholder {
+    color: rgba(0,180,40,0.2);
+    letter-spacing: 4px;
+    font-size: 18px;
+  }
+
+  .access-btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    cursor: crosshair;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .access-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0,255,65,0.15), transparent);
+    transition: left 0.4s;
+  }
+
+  .access-btn:hover {
+    background: rgba(0,255,65,0.08);
+    box-shadow: 0 0 20px rgba(0,255,65,0.2);
+    text-shadow: 0 0 10px var(--green);
+  }
+
+  .access-btn:hover::before { left: 100%; }
+
+  .error-msg {
+    color: var(--red);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-align: center;
+    margin-top: 10px;
+    height: 18px;
+    text-shadow: 0 0 8px var(--red);
+  }
+
+  .signal-bars {
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    position: absolute;
+    top: 14px; right: 14px;
+  }
+
+  .signal-bars span {
+    width: 4px;
+    background: var(--green-dim);
+    border-radius: 1px;
+  }
+  .signal-bars span:nth-child(1) { height: 6px; background: var(--green); }
+  .signal-bars span:nth-child(2) { height: 10px; background: var(--green); }
+  .signal-bars span:nth-child(3) { height: 14px; background: var(--green); }
+  .signal-bars span:nth-child(4) { height: 18px; }
+  .signal-bars span:nth-child(5) { height: 22px; }
+
+  .radio-status {
+    font-size: 10px;
+    color: var(--green-dim);
+    text-align: center;
+    margin-top: 20px;
+    letter-spacing: 2px;
+    animation: blink-status 3s infinite;
+  }
+
+  @keyframes blink-status {
+    0%, 49%, 100% { opacity: 1; }
+    50%, 60% { opacity: 0.3; }
+  }
+
+  /* ========== MAIN CONTENT ========== */
+  #main-content {
+    display: none;
+    min-height: 100vh;
+    position: relative;
+    z-index: 10;
+    padding: 0 0 60px;
+  }
+
+  #main-content.visible { display: block; animation: boot-in 0.6s ease; }
+
+  @keyframes boot-in {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  /* HEADER */
+  .ops-header {
+    border-bottom: 1px solid var(--green-dark);
+    padding: 16px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0,10,0,0.8);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(4px);
+  }
+
+  .ops-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .ops-badge {
+    width: 36px; height: 36px;
+    border: 2px solid var(--green);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    animation: pulse-glow 2s infinite;
+  }
+
+  .ops-codename {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-shadow: 0 0 10px var(--green);
+  }
+
+  .ops-codename span { color: var(--amber); }
+
+  .header-status {
+    font-size: 10px;
+    color: var(--green-dim);
+    letter-spacing: 2px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 11px;
+    color: var(--green-dim);
+    letter-spacing: 1px;
+  }
+
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--red);
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+    animation: blink 1s infinite;
+    box-shadow: 0 0 6px var(--red);
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* HERO */
+  .ops-hero {
+    padding: 60px 30px 40px;
+    text-align: center;
+    position: relative;
+  }
+
+  .ops-hero::before {
+    content: '▲ PIKE OPS ▲';
+    font-size: 10px;
+    letter-spacing: 8px;
+    color: var(--green-dark);
+    display: block;
+    margin-bottom: 20px;
+  }
+
+  .hero-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(36px, 8vw, 80px);
+    font-weight: 900;
+    letter-spacing: 6px;
+    line-height: 0.95;
+    margin-bottom: 10px;
+    text-shadow:
+      0 0 20px var(--green),
+      0 0 60px rgba(0,255,65,0.3),
+      0 0 100px rgba(0,255,65,0.1);
+    animation: flicker 6s infinite;
+  }
+
+  .hero-title .highlight { color: var(--amber); text-shadow: 0 0 20px var(--amber), 0 0 60px rgba(255,183,0,0.4); }
+
+  .hero-sub {
+    font-size: 12px;
+    letter-spacing: 8px;
+    color: var(--green-dim);
+    margin-bottom: 40px;
+  }
+
+  .hero-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 auto 50px;
+    max-width: 500px;
+  }
+
+  .hero-divider::before, .hero-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green-dim), transparent);
+  }
+
+  .hero-divider span {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--green-dim);
+  }
+
+  /* GRID */
+  .ops-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2px;
+    padding: 0 2px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .ops-card {
+    border: 1px solid var(--green-dark);
+    padding: 28px 26px;
+    background: rgba(0, 12, 0, 0.7);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .ops-card:hover {
+    border-color: var(--green-dim);
+    box-shadow: 0 0 20px rgba(0,255,65,0.08);
+  }
+
+  .ops-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--green-dark);
+    transition: background 0.3s;
+  }
+
+  .ops-card:hover::before { background: var(--green); box-shadow: 0 0 10px var(--green); }
+
+  .card-tag {
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--green-dim);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-tag::before {
+    content: '';
+    width: 16px; height: 1px;
+    background: var(--green-dim);
+  }
+
+  .card-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 0 6px rgba(0,255,65,0.4));
+  }
+
+  .card-value {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(20px, 3vw, 26px);
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 10px rgba(0,255,65,0.4);
+  }
+
+  .card-desc {
+    font-size: 11px;
+    color: var(--green-dim);
+    letter-spacing: 1px;
+    line-height: 1.6;
+  }
+
+  /* POLYMARKET CARD - SPECIAL */
+  .polymarket-card {
+    grid-column: 1 / -1;
+    border-color: var(--amber);
+    background: rgba(15, 10, 0, 0.9);
+    position: relative;
+  }
+
+  .polymarket-card::before { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+
+  .polymarket-card .card-tag { color: var(--amber); }
+  .polymarket-card .card-tag::before { background: var(--amber); }
+
+  .poly-inner {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    flex-wrap: wrap;
+  }
+
+  .poly-icon {
+    font-size: 42px;
+    filter: drop-shadow(0 0 10px rgba(255,183,0,0.6));
+    animation: pulse-amber 2s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse-amber {
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(255,183,0,0.4)); }
+    50% { filter: drop-shadow(0 0 20px rgba(255,183,0,0.8)); }
+  }
+
+  .poly-text { flex: 1; min-width: 200px; }
+
+  .poly-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--amber);
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 15px rgba(255,183,0,0.5);
+  }
+
+  .poly-desc {
+    font-size: 12px;
+    color: rgba(255,183,0,0.7);
+    letter-spacing: 1px;
+    line-height: 1.8;
+  }
+
+  .poly-code-box {
+    background: rgba(0,0,0,0.6);
+    border: 2px solid var(--amber);
+    padding: 16px 24px;
+    text-align: center;
+    flex-shrink: 0;
+    position: relative;
+    box-shadow: 0 0 20px rgba(255,183,0,0.2);
+  }
+
+  .poly-code-label {
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: rgba(255,183,0,0.5);
+    margin-bottom: 6px;
+  }
+
+  .poly-code {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--amber);
+    letter-spacing: 6px;
+    text-shadow: 0 0 20px var(--amber), 0 0 40px rgba(255,183,0,0.4);
+  }
+
+  .poly-code-sub {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255,183,0,0.5);
+    margin-top: 6px;
+  }
+
+  /* RULES CARD */
+  .rules-card {
+    grid-column: 1 / -1;
+  }
+
+  .rules-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .rule-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--green-dim);
+    padding: 8px 10px;
+    border-left: 2px solid var(--green-dark);
+  }
+
+  .rule-item::before {
+    content: '▸';
+    color: var(--green);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  /* COUNTDOWN */
+  .countdown-section {
+    max-width: 1100px;
+    margin: 2px auto 0;
+    border: 1px solid var(--green-dark);
+    background: rgba(0, 12, 0, 0.7);
+    padding: 30px 26px;
+    position: relative;
+  }
+
+  .countdown-label {
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: var(--green-dim);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .countdown-grid {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .countdown-unit {
+    text-align: center;
+    padding: 16px 20px;
+    border: 1px solid var(--green-dark);
+    min-width: 80px;
+    background: rgba(0,5,0,0.5);
+  }
+
+  .countdown-num {
+    font-family: 'VT323', monospace;
+    font-size: 48px;
+    color: var(--green);
+    text-shadow: 0 0 10px var(--green);
+    line-height: 1;
+    display: block;
+  }
+
+  .countdown-lbl {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--green-dim);
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* FOOTER */
+  .ops-footer {
+    text-align: center;
+    padding: 40px 20px 20px;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--green-dark);
+    position: relative;
+  }
+
+  .ops-footer::before {
+    content: '';
+    display: block;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green-dark), transparent);
+    margin-bottom: 20px;
+  }
+
+  /* TRANSMISSION TICKER */
+  .ticker {
+    background: rgba(0,10,0,0.9);
+    border-top: 1px solid var(--green-dark);
+    border-bottom: 1px solid var(--green-dark);
+    padding: 8px 0;
+    overflow: hidden;
+    margin: 2px 0;
+  }
+
+  .ticker-inner {
+    display: flex;
+    animation: ticker-scroll 30s linear infinite;
+    white-space: nowrap;
+  }
+
+  .ticker-item {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--green-dim);
+    padding: 0 40px;
+  }
+
+  .ticker-item span { color: var(--amber); }
+
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* GLITCH EFFECT */
+  .glitch {
+    position: relative;
+  }
+
+  .glitch::before, .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  .glitch::before {
+    color: var(--red);
+    animation: glitch-before 6s infinite;
+    clip-path: polygon(0 0, 100% 0, 100% 33%, 0 33%);
+  }
+
+  .glitch::after {
+    color: #00ffff;
+    animation: glitch-after 6s infinite;
+    clip-path: polygon(0 66%, 100% 66%, 100% 100%, 0 100%);
+  }
+
+  @keyframes glitch-before {
+    0%, 90%, 100% { transform: translate(0); opacity: 0; }
+    91% { transform: translate(-3px, 1px); opacity: 0.7; }
+    94% { transform: translate(3px, -1px); opacity: 0.7; }
+    97% { transform: translate(0); opacity: 0; }
+  }
+
+  @keyframes glitch-after {
+    0%, 88%, 100% { transform: translate(0); opacity: 0; }
+    89% { transform: translate(3px, 1px); opacity: 0.7; }
+    92% { transform: translate(-3px, -1px); opacity: 0.7; }
+    95% { transform: translate(0); opacity: 0; }
+  }
+
+  /* DECRYPTING ANIMATION */
+  .decrypting {
+    display: none;
+  }
+
+  .decrypting.active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 0 0;
+  }
+
+  .decrypt-bar {
+    width: 100%;
+    height: 2px;
+    background: var(--green-dark);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .decrypt-bar-fill {
+    height: 100%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    width: 0%;
+    transition: width 1.5s ease;
+  }
+
+  .decrypt-text {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--green-dim);
+  }
+
+  @media (max-width: 600px) {
+    .terminal-frame { padding: 28px 24px; }
+    .poly-inner { flex-direction: column; align-items: flex-start; }
+    .ops-header { padding: 12px 16px; }
+    .header-right { display: none; }
+    .hero-title { font-size: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="camo-bg"></div>
+<canvas id="matrix-canvas"></canvas>
+
+<!-- AUDIO -->
+<audio id="radio-audio" loop>
+  <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+</audio>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="login-screen">
+  <div class="terminal-frame">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="signal-bars">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+
+    <div style="text-align:center; margin-bottom: 20px;">
+      <div class="classified-stamp">⚠ TOP SECRET ⚠</div>
+    </div>
+
+    <div class="skull-icon">☠</div>
+    <div class="op-title glitch" data-text="PIKE OPS">PIKE OPS</div>
+    <div class="op-subtitle">OPERATION // CLASSIFIED</div>
+
+    <div class="boot-log">
+      <div class="terminal-line"><span class="prompt">SYS &gt;</span> Establishing secure channel...</div>
+      <div class="terminal-line"><span class="prompt">SYS &gt;</span> Encryption: AES-256 active</div>
+      <div class="terminal-line"><span class="prompt">SYS &gt;</span> Awaiting operator authentication</div>
+    </div>
+
+    <div class="access-label">// ENTER OPERATION ACCESS CODE</div>
+    <div class="code-input-wrapper" id="input-wrapper">
+      <span class="input-prompt">OPER &gt;&nbsp;</span>
+      <input type="password" id="access-code" maxlength="4" placeholder="████" autocomplete="off" autofocus />
+    </div>
+
+    <div class="decrypting" id="decrypting">
+      <div class="decrypt-text">DECRYPTING...</div>
+      <div class="decrypt-bar"><div class="decrypt-bar-fill" id="decrypt-fill"></div></div>
+    </div>
+
+    <div class="error-msg" id="error-msg"></div>
+
+    <button class="access-btn" onclick="checkCode()">
+      ▶ AUTHENTICATE ACCESS ◀
+    </button>
+
+    <div class="radio-status">⬤ FREQ 14.680 MHz // SECURE CHANNEL ACTIVE</div>
+  </div>
+</div>
+
+<!-- ============ MAIN CONTENT ============ -->
+<div id="main-content">
+
+  <header class="ops-header">
+    <div class="ops-header-left">
+      <div class="ops-badge">☠</div>
+      <div>
+        <div class="ops-codename">PIKE <span>OPS</span></div>
+        <div class="header-status">ACCESS GRANTED // AUTHENTICATED</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div><span class="live-dot"></span>LIVE INTEL</div>
+      <div>FREQ 14.680</div>
+      <div id="header-time"></div>
+    </div>
+  </header>
+
+  <div class="ticker">
+    <div class="ticker-inner" id="ticker">
+      <span class="ticker-item">⬤ PIKE OPS <span>// OPERATION CONFIRMED</span></span>
+      <span class="ticker-item">⬤ DATE: <span>21 MAR // 1200 HRS</span></span>
+      <span class="ticker-item">⬤ LOCATION: <span>111 MILL ST // GRID CONFIRMED</span></span>
+      <span class="ticker-item">⬤ POLYMARKET CODE: <span>PIKEOU // $10 VOUCHER WITH $1 DEPOSIT</span></span>
+      <span class="ticker-item">⬤ IFC RULES <span>// IN EFFECT</span></span>
+      <span class="ticker-item">⬤ DRESS CODE: <span>CAMO // ALL UNITS</span></span>
+      <span class="ticker-item">⬤ PIKE OPS <span>// OPERATION CONFIRMED</span></span>
+      <span class="ticker-item">⬤ DATE: <span>21 MAR // 1200 HRS</span></span>
+      <span class="ticker-item">⬤ LOCATION: <span>111 MILL ST // GRID CONFIRMED</span></span>
+      <span class="ticker-item">⬤ POLYMARKET CODE: <span>PIKEOU // $10 VOUCHER WITH $1 DEPOSIT</span></span>
+      <span class="ticker-item">⬤ IFC RULES <span>// IN EFFECT</span></span>
+      <span class="ticker-item">⬤ DRESS CODE: <span>CAMO // ALL UNITS</span></span>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="ops-hero">
+    <div class="hero-title glitch" data-text="PIKE OPS">
+      PI<span class="highlight">K</span>E<br>OPS
+    </div>
+    <div class="hero-sub">// OPERATION DETAILS // AUTHORIZED PERSONNEL ONLY //</div>
+    <div class="hero-divider"><span>INTEL BRIEFING</span></div>
+  </div>
+
+  <!-- INFO GRID -->
+  <div class="ops-grid">
+
+    <div class="ops-card">
+      <div class="card-tag">MISSION DATE</div>
+      <div class="card-icon">📅</div>
+      <div class="card-value">21 MARCH</div>
+      <div class="card-desc">DEPLOYMENT: 1200 HRS<br>REPORT ON TIME // NO STRAGGLERS</div>
+    </div>
+
+    <div class="ops-card">
+      <div class="card-tag">GRID COORDINATES</div>
+      <div class="card-icon">📍</div>
+      <div class="card-value">111 MILL ST</div>
+      <div class="card-desc">CONFIRMED RALLY POINT<br>ALL UNITS CONVERGE ON TARGET</div>
+    </div>
+
+    <div class="ops-card">
+      <div class="card-tag">UNIFORM / DRESS CODE</div>
+      <div class="card-icon">🎖</div>
+      <div class="card-value">CAMO GEAR</div>
+      <div class="card-desc">FULL CAMO REQUIRED<br>BLEND IN // STAND OUT</div>
+    </div>
+
+    <div class="ops-card">
+      <div class="card-tag">RULES OF ENGAGEMENT</div>
+      <div class="card-icon">⚖️</div>
+      <div class="card-value">IFC RULES</div>
+      <div class="card-desc">IFC REGULATIONS APPLY<br>ALL OPERATORS MUST COMPLY</div>
+    </div>
+
+    <!-- POLYMARKET SPECIAL CARD -->
+    <div class="ops-card polymarket-card">
+      <div class="card-tag">CLASSIFIED INTEL // BONUS MISSION</div>
+      <div class="poly-inner">
+        <div class="poly-icon">💰</div>
+        <div class="poly-text">
+          <div class="poly-title">POLYMARKET VOUCHER MISSION</div>
+          <div class="poly-desc">
+            DEPLOY CODE <strong style="color:var(--amber)">PIKEOU</strong> ON POLYMARKET<br>
+            DEPOSIT $1 → RECEIVE $10 FREE VOUCHER<br>
+            COMPLETE THE MISSION // COLLECT YOUR INTEL BONUS
+          </div>
+        </div>
+        <div class="poly-code-box">
+          <div class="poly-code-label">VOUCHER CODE</div>
+          <div class="poly-code">PIKEOU</div>
+          <div class="poly-code-sub">$1 DEPOSIT → $10 FREE</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RULES CARD -->
+    <div class="ops-card rules-card">
+      <div class="card-tag">OPERATION BRIEFING</div>
+      <div class="card-icon">📋</div>
+      <div class="card-value" style="font-size: 18px; margin-bottom: 16px;">MISSION PARAMETERS</div>
+      <div class="rules-list">
+        <div class="rule-item">Date: March 21st, 1200 HRS</div>
+        <div class="rule-item">Location: 111 Mill St</div>
+        <div class="rule-item">Dress: Camo Required</div>
+        <div class="rule-item">IFC Rules In Effect</div>
+        <div class="rule-item">Polymarket Code: PIKEOU</div>
+        <div class="rule-item">Deposit $1 → Get $10</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- COUNTDOWN -->
+  <div class="ops-grid" style="margin-top: 2px;">
+    <div class="countdown-section">
+      <div class="countdown-label">// T-MINUS UNTIL DEPLOYMENT //</div>
+      <div class="countdown-grid">
+        <div class="countdown-unit">
+          <span class="countdown-num" id="cd-days">00</span>
+          <span class="countdown-lbl">DAYS</span>
+        </div>
+        <div class="countdown-unit">
+          <span class="countdown-num" id="cd-hours">00</span>
+          <span class="countdown-lbl">HOURS</span>
+        </div>
+        <div class="countdown-unit">
+          <span class="countdown-num" id="cd-mins">00</span>
+          <span class="countdown-lbl">MINUTES</span>
+        </div>
+        <div class="countdown-unit">
+          <span class="countdown-num" id="cd-secs">00</span>
+          <span class="countdown-lbl">SECONDS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ops-footer">
+    <div>PIKE OPS // AUTHORIZED PERSONNEL ONLY // ALL INTEL CLASSIFIED</div>
+    <div style="margin-top: 6px; color: var(--green-dark);">Ψ IFC RULES APPLY // STAY FROSTY // SEE YOU IN THE FIELD Ψ</div>
+  </div>
+
+</div>
+
+<script>
+// ============ MATRIX RAIN ============
+const canvas = document.getElementById('matrix-canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const chars = '01アイウエオカキクケコBINARYCLASSIFIED10PIKEOPS☠⬤▸▼△';
+const fontSize = 12;
+let drops = [];
+
+function initDrops() {
+  const cols = Math.floor(canvas.width / fontSize);
+  drops = Array(cols).fill(1);
+}
+initDrops();
+
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(0, 2, 0, 0.04)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#003300';
+  ctx.font = fontSize + 'px Share Tech Mono';
+  drops.forEach((y, i) => {
+    const char = chars[Math.floor(Math.random() * chars.length)];
+    ctx.fillStyle = i % 7 === 0 ? '#00ff41' : '#003300';
+    ctx.fillText(char, i * fontSize, y * fontSize);
+    if (y * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  });
+}
+
+setInterval(drawMatrix, 60);
+
+// ============ WAR SOUNDSCAPE ============
+let audioCtx = null;
+
+function startRadioStatic() {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // --- RADIO STATIC (continuous low hiss) ---
+    const bufferSize = 4096;
+    const staticNode = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+    staticNode.onaudioprocess = function(e) {
+      const out = e.outputBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        out[i] = (Math.random() * 2 - 1) * 0.025;
+      }
+    };
+    const staticGain = audioCtx.createGain();
+    staticGain.gain.value = 0.7;
+    staticNode.connect(staticGain);
+    staticGain.connect(audioCtx.destination);
+
+    // --- RADIO BLIPS ---
+    const blipOsc = audioCtx.createOscillator();
+    blipOsc.type = 'sine';
+    blipOsc.frequency.value = 880;
+    const blipGain = audioCtx.createGain();
+    blipGain.gain.value = 0;
+    blipOsc.connect(blipGain);
+    blipGain.connect(audioCtx.destination);
+    blipOsc.start();
+
+    function randomBlip() {
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      blipGain.gain.setValueAtTime(0, now);
+      blipGain.gain.linearRampToValueAtTime(0.06, now + 0.04);
+      blipGain.gain.linearRampToValueAtTime(0, now + 0.12);
+      blipOsc.frequency.setValueAtTime(400 + Math.random() * 900, now);
+      setTimeout(randomBlip, 4000 + Math.random() * 10000);
+    }
+    setTimeout(randomBlip, 1500);
+
+    // --- DISTANT GUNSHOT ---
+    // Sharp transient noise burst with fast attack, quick decay + low-pass
+    function fireGunshot() {
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+
+      // Noise source
+      const shotBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.18, audioCtx.sampleRate);
+      const shotData = shotBuf.getChannelData(0);
+      for (let i = 0; i < shotData.length; i++) {
+        shotData[i] = (Math.random() * 2 - 1);
+      }
+      const shotSrc = audioCtx.createBufferSource();
+      shotSrc.buffer = shotBuf;
+
+      // Low-pass so it sounds distant/muffled
+      const lpf = audioCtx.createBiquadFilter();
+      lpf.type = 'lowpass';
+      lpf.frequency.value = 800 + Math.random() * 600;
+      lpf.Q.value = 0.8;
+
+      // Gain envelope: sharp crack then tail
+      const shotGain = audioCtx.createGain();
+      shotGain.gain.setValueAtTime(0, now);
+      shotGain.gain.linearRampToValueAtTime(0.55 + Math.random() * 0.25, now + 0.003);
+      shotGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      // Subtle reverb tail via second noise burst
+      const tailBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.35, audioCtx.sampleRate);
+      const tailData = tailBuf.getChannelData(0);
+      for (let i = 0; i < tailData.length; i++) {
+        tailData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.08));
+      }
+      const tailSrc = audioCtx.createBufferSource();
+      tailSrc.buffer = tailBuf;
+
+      const tailLpf = audioCtx.createBiquadFilter();
+      tailLpf.type = 'lowpass';
+      tailLpf.frequency.value = 500;
+
+      const tailGain = audioCtx.createGain();
+      tailGain.gain.setValueAtTime(0.12, now);
+      tailGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+      // Stereo panning — distant shots come from random directions
+      const panner = audioCtx.createStereoPanner();
+      panner.pan.value = (Math.random() * 1.6) - 0.8;
+
+      shotSrc.connect(lpf);
+      lpf.connect(shotGain);
+      shotGain.connect(panner);
+      panner.connect(audioCtx.destination);
+
+      tailSrc.connect(tailLpf);
+      tailLpf.connect(tailGain);
+      tailGain.connect(panner);
+
+      shotSrc.start(now);
+      tailSrc.start(now);
+
+      // Sometimes fire a quick 2nd shot (double-tap)
+      if (Math.random() < 0.25) {
+        setTimeout(() => fireGunshot(), 150 + Math.random() * 200);
+      }
+
+      // Schedule next gunshot
+      const nextShot = 6000 + Math.random() * 10000;
+      setTimeout(fireGunshot, nextShot);
+    }
+    setTimeout(fireGunshot, 4000 + Math.random() * 4000);
+
+    // --- DISTANT EXPLOSION / BOOM ---
+    function fireExplosion() {
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const duration = 1.8 + Math.random() * 1.2;
+
+      // Low-frequency rumble: sub-bass sine sweep down
+      const rumbleOsc = audioCtx.createOscillator();
+      rumbleOsc.type = 'sine';
+      rumbleOsc.frequency.setValueAtTime(80 + Math.random() * 40, now);
+      rumbleOsc.frequency.exponentialRampToValueAtTime(20, now + duration);
+
+      const rumbleGain = audioCtx.createGain();
+      rumbleGain.gain.setValueAtTime(0, now);
+      rumbleGain.gain.linearRampToValueAtTime(0.5 + Math.random() * 0.25, now + 0.04);
+      rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      // Noise body of explosion
+      const expBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
+      const expData = expBuf.getChannelData(0);
+      for (let i = 0; i < expData.length; i++) {
+        expData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.35));
+      }
+      const expSrc = audioCtx.createBufferSource();
+      expSrc.buffer = expBuf;
+
+      const expLpf = audioCtx.createBiquadFilter();
+      expLpf.type = 'lowpass';
+      expLpf.frequency.value = 300 + Math.random() * 200;
+
+      const expGain = audioCtx.createGain();
+      expGain.gain.setValueAtTime(0.4 + Math.random() * 0.2, now);
+      expGain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.9);
+
+      // Wide stereo spread for explosions
+      const expPanner = audioCtx.createStereoPanner();
+      expPanner.pan.value = (Math.random() * 1.2) - 0.6;
+
+      rumbleOsc.connect(rumbleGain);
+      rumbleGain.connect(expPanner);
+
+      expSrc.connect(expLpf);
+      expLpf.connect(expGain);
+      expGain.connect(expPanner);
+
+      expPanner.connect(audioCtx.destination);
+
+      rumbleOsc.start(now);
+      rumbleOsc.stop(now + duration);
+      expSrc.start(now);
+
+      // Schedule next boom
+      const nextBoom = 5000 + Math.random() * 10000;
+      setTimeout(fireExplosion, nextBoom);
+    }
+    setTimeout(fireExplosion, 2500 + Math.random() * 3000);
+
+    // --- DISTANT HELICOPTER (very faint, occasional) ---
+    function fireHelicopter() {
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const chop = audioCtx.createOscillator();
+      chop.type = 'sawtooth';
+      chop.frequency.value = 12 + Math.random() * 4; // blade frequency ~12-16 Hz
+
+      const chopFilter = audioCtx.createBiquadFilter();
+      chopFilter.type = 'bandpass';
+      chopFilter.frequency.value = 180;
+      chopFilter.Q.value = 1.5;
+
+      const chopGain = audioCtx.createGain();
+      const fadeDur = 5 + Math.random() * 4;
+      chopGain.gain.setValueAtTime(0, now);
+      chopGain.gain.linearRampToValueAtTime(0.04, now + 1.5);
+      chopGain.gain.setValueAtTime(0.04, now + fadeDur - 1.5);
+      chopGain.gain.linearRampToValueAtTime(0, now + fadeDur);
+
+      chop.connect(chopFilter);
+      chopFilter.connect(chopGain);
+      chopGain.connect(audioCtx.destination);
+
+      chop.start(now);
+      chop.stop(now + fadeDur);
+
+      setTimeout(fireHelicopter, 10000 + Math.random() * 15000);
+    }
+    setTimeout(fireHelicopter, 5000 + Math.random() * 6000);
+
+  } catch(e) { console.warn('Audio init failed:', e); }
+}
+
+// ============ LOGIN LOGIC ============
+const ACCESS_CODE = '1868';
+
+document.getElementById('access-code').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') checkCode();
+  clearError();
+});
+
+document.getElementById('access-code').addEventListener('input', function() {
+  clearError();
+  document.getElementById('input-wrapper').classList.remove('error');
+});
+
+function clearError() {
+  document.getElementById('error-msg').textContent = '';
+}
+
+function checkCode() {
+  const input = document.getElementById('access-code').value;
+  const wrapper = document.getElementById('input-wrapper');
+  const errorMsg = document.getElementById('error-msg');
+  const decrypting = document.getElementById('decrypting');
+  const decryptFill = document.getElementById('decrypt-fill');
+
+  if (input === ACCESS_CODE) {
+    // Start audio
+    startRadioStatic();
+
+    // Show decrypting
+    wrapper.style.display = 'none';
+    document.querySelector('.access-btn').style.display = 'none';
+    decrypting.classList.add('active');
+
+    setTimeout(() => { decryptFill.style.width = '100%'; }, 50);
+
+    setTimeout(() => {
+      // Decrypt text changes
+      decrypting.querySelector('.decrypt-text').textContent = 'ACCESS GRANTED ✓';
+      decrypting.querySelector('.decrypt-text').style.color = 'var(--green)';
+    }, 1400);
+
+    setTimeout(() => {
+      // Fade out login, show main
+      document.getElementById('login-screen').classList.add('fade-out');
+      setTimeout(() => {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-content').classList.add('visible');
+        startCountdown();
+        updateHeaderTime();
+        setInterval(updateHeaderTime, 1000);
+      }, 800);
+    }, 2000);
+
+  } else if (input.length === 4) {
+    wrapper.classList.add('error');
+    errorMsg.textContent = '⚠ ACCESS DENIED // INVALID CODE ⚠';
+    document.getElementById('access-code').value = '';
+    setTimeout(() => {
+      wrapper.classList.remove('error');
+      errorMsg.textContent = '';
+    }, 2000);
+  }
+}
+
+// ============ COUNTDOWN ============
+function startCountdown() {
+  const target = new Date('2026-03-21T12:00:00');
+
+  function update() {
+    const now = new Date();
+    const diff = target - now;
+    if (diff <= 0) {
+      document.getElementById('cd-days').textContent = '00';
+      document.getElementById('cd-hours').textContent = '00';
+      document.getElementById('cd-mins').textContent = '00';
+      document.getElementById('cd-secs').textContent = '00';
+      return;
+    }
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    document.getElementById('cd-days').textContent = String(days).padStart(2, '0');
+    document.getElementById('cd-hours').textContent = String(hours).padStart(2, '0');
+    document.getElementById('cd-mins').textContent = String(mins).padStart(2, '0');
+    document.getElementById('cd-secs').textContent = String(secs).padStart(2, '0');
+  }
+
+  update();
+  setInterval(update, 1000);
+}
+
+// ============ HEADER TIME ============
+function updateHeaderTime() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  const el = document.getElementById('header-time');
+  if (el) el.textContent = `${h}${m}Z MAR 2026`;
+}
+
+// Keyboard enter on login
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') {
+    checkCode();
+  }
+});
+</script>
+</body>
+</html>
